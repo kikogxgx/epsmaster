@@ -1,11 +1,11 @@
 import { useLocalStorage } from './useLocalStorage';
 import type { AbsenceProfesseur, RemplacementSeance } from '../types';
-import { useReprogrammationSeances } from './useReprogrammationSeances';
+import { usePlanification } from './usePlanification';
 
 const newId = () => `abs-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
 export function useAbsencesProfesseur() {
-  const { appliquerReprogrammation, annulerReprogrammation } = useReprogrammationSeances();
+  const { appliquerPlanification, annulerPlanification } = usePlanification();
   
   const [absences, setAbsences] = useLocalStorage<AbsenceProfesseur[]>('eps:absences-prof', []);
   const [remplacements, setRemplacements] = useLocalStorage<RemplacementSeance[]>('eps:remplacements', []);
@@ -46,15 +46,15 @@ export function useAbsencesProfesseur() {
   };
 
   /**
-   * Valide une absence et déclenche la reprogrammation
+   * Valide une absence et déclenche la planification
    */
   const validerAbsence = (id: string) => {
     const absence = absences.find(a => a.id === id);
     if (!absence) return { success: false, message: 'Absence introuvable' };
 
     try {
-      // Appliquer la reprogrammation
-      const { nbSeancesReportees } = appliquerReprogrammation(absence);
+      // Appliquer la nouvelle planification
+      const { nbSeancesReportees } = appliquerPlanification(absence);
 
       // Mettre à jour le statut de l'absence
       const absenceValidee: AbsenceProfesseur = {
@@ -67,15 +67,15 @@ export function useAbsencesProfesseur() {
 
       return {
         success: true,
-        message: nbSeancesReportees > 0 
-          ? `✅ Reprogrammation effectuée : ${nbSeancesReportees} séance(s) reportée(s).`
+        message: nbSeancesReportees > 0
+          ? `✅ Planification ajustée : ${nbSeancesReportees} séance(s) reportée(s).`
           : `✅ Absence validée. Aucune séance à reporter pour cette période.`,
         nbSeancesReportees
       };
     } catch (error) {
       return {
         success: false,
-        message: `❌ Erreur lors de la reprogrammation : ${error instanceof Error ? error.message : 'Erreur inconnue'}`
+        message: `❌ Erreur lors de la planification : ${error instanceof Error ? error.message : 'Erreur inconnue'}`
       };
     }
   };
@@ -98,10 +98,10 @@ export function useAbsencesProfesseur() {
    * Supprime une absence
    */
   const deleteAbsence = (id: string) => {
-    // Avant de supprimer l'absence, annuler la reprogrammation liée à cette absence
+    // Avant de supprimer l'absence, annuler la planification liée à cette absence
     const absence = absences.find(a => a.id === id);
     if (absence && absence.statut === 'approuve') {
-      annulerReprogrammation(absence);
+      annulerPlanification(absence);
     }
     setAbsences(prev => prev.filter(a => a.id !== id));
     return { success: true, message: '🗑️ Absence supprimée.' };

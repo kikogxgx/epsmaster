@@ -7,6 +7,7 @@ import StudentsPage from './pages/StudentsPage';
 import CyclesPage from './pages/CyclesPage';
 import CycleDetailPage from './pages/CycleDetailPage';
 import AbsencesProfesseurPage from './pages/AbsencesProfesseurPage';
+import PlanningPro from './pages/PlanningPro';
 import AppelSeance from './pages/AppelSeance';
 import CahierSeance from './pages/CahierSeance';
 import EvaluationSeance from './pages/EvaluationSeance';
@@ -22,6 +23,7 @@ function App() {
         <Route path="cycles" element={<CyclesPage />} />
         <Route path="cycles/:id" element={<CycleDetailPage />} />
         <Route path="absences-prof" element={<AbsencesProfesseurPage />} />
+        <Route path="planning-pro" element={<PlanningPro />} />
 
       {/* Routes des modules pédagogiques */}
       <Route path="classe/:classeId/seance/:seanceId/appel" element={<AppelSeance />} />
