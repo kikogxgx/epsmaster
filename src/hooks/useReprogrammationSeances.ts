@@ -7,6 +7,127 @@ interface SeanceAvecReportage extends Seance {
   dateOriginale?: string;
 }
 
+/**
+ * Reprogramme un cycle avec glissement complet des séances à partir de la première séance impactée.
+ * Les séances sont repositionnées en conservant l'ordre d'origine mais en avançant les dates
+ * selon le motif des écarts entre séances. On marque les séances touchées par l'absence comme reportées.
+ * Les dates fournies dans `datesIndisponibles` sont ignorées lors du repositionnement.
+ */
+export function reprogrammerCycle(
+  cycle: Cycle,
+  absence: AbsenceProfesseur,
+  datesIndisponibles: string[] = []
+): { cycleModifie: Cycle; nbSeancesReportees: number } {
+  const dateDebutAbsence = new Date(absence.dateDebut);
+  const dateFinAbsence = new Date(absence.dateFin);
+  const aujourdHui = new Date();
+  aujourdHui.setHours(0, 0, 0, 0);
+
+  const datesBloquees = new Set(datesIndisponibles);
+
+  // Copier les séances du cycle dans l'ordre d'origine pour la reprogrammation
+  const seancesOriginalOrder: SeanceAvecReportage[] = cycle.seances.map(s => ({ ...s }));
+
+  // Déterminer l'index de la première séance impactée par l'absence
+  const impactedIndices: number[] = [];
+  for (let i = 0; i < seancesOriginalOrder.length; i++) {
+    const seance = seancesOriginalOrder[i];
+    const dateSeance = new Date(seance.date);
+    const estImpactee =
+      dateSeance >= dateDebutAbsence &&
+      dateSeance <= dateFinAbsence &&
+      dateSeance >= aujourdHui &&
+      !seance.locked &&
+      (seance as any).absenceOriginId !== absence.id;
+    if (estImpactee) impactedIndices.push(i);
+  }
+
+  if (impactedIndices.length === 0) {
+    return { cycleModifie: { ...cycle }, nbSeancesReportees: 0 };
+  }
+
+  const firstImpacted = Math.min(...impactedIndices);
+
+  // Construire un set des créneaux occupés uniquement pour les séances avant la première impactée
+  const creneauxOccupes = new Set<string>();
+  seancesOriginalOrder.forEach((seance, idx) => {
+    if (idx < firstImpacted) {
+      const heure = seance.heure || '09:30';
+      creneauxOccupes.add(`${seance.date}-${heure}`);
+    }
+  });
+
+  // Calculer le motif des écarts entre séances consécutives, trié par date croissante
+  const seancesSorted = [...seancesOriginalOrder].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  const diffOriginal: number[] = [];
+  for (let i = 0; i < seancesSorted.length - 1; i++) {
+    const d1 = new Date(seancesSorted[i].date);
+    const d2 = new Date(seancesSorted[i + 1].date);
+    const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+    diffOriginal.push(diff > 0 ? diff : 7);
+  }
+  if (diffOriginal.length === 0) diffOriginal.push(7);
+
+  // Construire un tableau d'écarts pour chaque séance en répétant le motif
+  const diffDays: number[] = [];
+  for (let i = 0; i < seancesOriginalOrder.length; i++) {
+    diffDays.push(diffOriginal[i % diffOriginal.length]);
+  }
+
+  // Préparer un tableau des nouvelles dates
+  const newDates: string[] = seancesOriginalOrder.map(s => s.date);
+  let nbReportees = 0;
+
+  for (let i = firstImpacted; i < seancesOriginalOrder.length; i++) {
+    const seance = seancesOriginalOrder[i];
+    const heure = seance.heure || '09:30';
+    let candidateDate: Date;
+    if (i === firstImpacted) {
+      candidateDate = new Date(seance.date);
+      candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
+    } else {
+      candidateDate = new Date(newDates[i - 1]);
+      candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
+    }
+    let candidateIso = candidateDate.toISOString().slice(0, 10);
+    // Avancer jusqu'à trouver un créneau libre, hors absence et hors dates indisponibles
+    while (
+      creneauxOccupes.has(`${candidateIso}-${heure}`) ||
+      (candidateDate >= dateDebutAbsence && candidateDate <= dateFinAbsence) ||
+      datesBloquees.has(candidateIso)
+    ) {
+      candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
+      candidateIso = candidateDate.toISOString().slice(0, 10);
+    }
+    newDates[i] = candidateIso;
+    creneauxOccupes.add(`${candidateIso}-${heure}`);
+    if (impactedIndices.includes(i)) {
+      seancesOriginalOrder[i].estReportee = true;
+      seancesOriginalOrder[i].absenceOriginId = absence.id as any;
+      seancesOriginalOrder[i].dateOriginale = seance.date;
+      nbReportees++;
+    }
+  }
+
+  // Appliquer les nouvelles dates
+  let seancesFinal: Seance[] = seancesOriginalOrder.map((s, idx) => ({
+    ...s,
+    date: newDates[idx]
+  }));
+
+  // Trier par date et recalculer les numéros
+  seancesFinal = seancesFinal
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((s, idx) => ({ ...s, numero: idx + 1 }));
+
+  return {
+    cycleModifie: { ...cycle, seances: seancesFinal },
+    nbSeancesReportees: nbReportees
+  };
+}
+
 export function useReprogrammationSeances() {
   const { state, updateCycle } = useEpsData();
 
@@ -71,127 +192,24 @@ export function useReprogrammationSeances() {
   };
 
   /**
-   * Reprogramme un cycle avec glissement complet des séances à partir de la première séance impactée.
-   * Les séances sont repositionnées en conservant l'ordre d'origine mais en avançant les dates
-   * selon le motif des écarts entre séances. On marque les séances touchées par l'absence comme reportées.
-   */
-  const reprogrammerCycle = (
-    cycle: Cycle,
-    absence: AbsenceProfesseur
-  ): { cycleModifie: Cycle; nbSeancesReportees: number } => {
-    const dateDebutAbsence = new Date(absence.dateDebut);
-    const dateFinAbsence = new Date(absence.dateFin);
-    const aujourdHui = new Date();
-    aujourdHui.setHours(0, 0, 0, 0);
-
-    // Copier les séances du cycle dans l'ordre d'origine pour la reprogrammation
-    const seancesOriginalOrder: SeanceAvecReportage[] = cycle.seances.map(s => ({ ...s }));
-
-    // Déterminer l'index de la première séance impactée par l'absence
-    const impactedIndices: number[] = [];
-    for (let i = 0; i < seancesOriginalOrder.length; i++) {
-      const seance = seancesOriginalOrder[i];
-      const dateSeance = new Date(seance.date);
-      const estImpactee =
-        dateSeance >= dateDebutAbsence &&
-        dateSeance <= dateFinAbsence &&
-        dateSeance >= aujourdHui &&
-        !seance.locked &&
-        (seance as any).absenceOriginId !== absence.id;
-      if (estImpactee) impactedIndices.push(i);
-    }
-
-    if (impactedIndices.length === 0) {
-      return { cycleModifie: { ...cycle }, nbSeancesReportees: 0 };
-    }
-
-    const firstImpacted = Math.min(...impactedIndices);
-
-    // Construire un set des créneaux occupés (date-heure) pour détecter les collisions
-    const creneauxOccupes = new Set<string>();
-    seancesOriginalOrder.forEach(seance => {
-      const heure = seance.heure || '09:30';
-      creneauxOccupes.add(`${seance.date}-${heure}`);
-    });
-
-    // Calculer le motif des écarts entre séances consécutives, trié par date croissante
-    const seancesSorted = [...seancesOriginalOrder].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const diffOriginal: number[] = [];
-    for (let i = 0; i < seancesSorted.length - 1; i++) {
-      const d1 = new Date(seancesSorted[i].date);
-      const d2 = new Date(seancesSorted[i + 1].date);
-      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-      diffOriginal.push(diff > 0 ? diff : 7);
-    }
-    if (diffOriginal.length === 0) diffOriginal.push(7);
-
-    // Construire un tableau d'écarts pour chaque séance en répétant le motif
-    const diffDays: number[] = [];
-    for (let i = 0; i < seancesOriginalOrder.length; i++) {
-      diffDays.push(diffOriginal[i % diffOriginal.length]);
-    }
-
-    // Préparer un tableau des nouvelles dates
-    const newDates: string[] = seancesOriginalOrder.map(s => s.date);
-    let nbReportees = 0;
-
-    for (let i = firstImpacted; i < seancesOriginalOrder.length; i++) {
-      const seance = seancesOriginalOrder[i];
-      const heure = seance.heure || '09:30';
-      let candidateDate: Date;
-      if (i === firstImpacted) {
-        candidateDate = new Date(seance.date);
-        candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
-      } else {
-        candidateDate = new Date(newDates[i - 1]);
-        candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
-      }
-      let candidateIso = candidateDate.toISOString().slice(0, 10);
-      // Avancer en respectant le motif jusqu'à trouver un créneau libre et hors intervalle d'absence
-      while (
-        creneauxOccupes.has(`${candidateIso}-${heure}`) ||
-        (candidateDate >= dateDebutAbsence && candidateDate <= dateFinAbsence)
-      ) {
-        candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
-        candidateIso = candidateDate.toISOString().slice(0, 10);
-      }
-      // Mettre à jour newDates et creneaux
-      creneauxOccupes.delete(`${seance.date}-${heure}`);
-      newDates[i] = candidateIso;
-      creneauxOccupes.add(`${candidateIso}-${heure}`);
-      // Marquer les séances dans l'intervalle comme reportées
-      if (impactedIndices.includes(i)) {
-        seancesOriginalOrder[i].estReportee = true;
-        seancesOriginalOrder[i].absenceOriginId = absence.id as any;
-        seancesOriginalOrder[i].dateOriginale = seance.date;
-        nbReportees++;
-      }
-    }
-
-    // Appliquer les nouvelles dates et conserver l'ordre d'origine
-    const seancesFinal: Seance[] = seancesOriginalOrder.map((s, idx) => ({
-      ...s,
-      date: newDates[idx]
-    }));
-
-    return {
-      cycleModifie: { ...cycle, seances: seancesFinal },
-      nbSeancesReportees: nbReportees
-    };
-  };
-
-  /**
    * Applique la reprogrammation pour tous les cycles impactés
    */
-  const appliquerReprogrammation = (absence: AbsenceProfesseur) => {
+  const appliquerReprogrammation = (
+    absence: AbsenceProfesseur,
+    datesIndisponibles: string[] = []
+  ) => {
     let totalSeancesReportees = 0;
     const cyclesModifies: string[] = [];
 
     state.cycles.forEach(cycle => {
-      const { cycleModifie, nbSeancesReportees } = reprogrammerCycle(cycle, absence);
-      
+      const { cycleModifie, nbSeancesReportees } = reprogrammerCycle(
+        cycle,
+        absence,
+        datesIndisponibles
+      );
+
       if (nbSeancesReportees > 0) {
-        updateCycle(cycle.id, { 
+        updateCycle(cycle.id, {
           seances: cycleModifie.seances,
           updatedAt: new Date().toISOString()
         });

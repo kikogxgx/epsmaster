@@ -1,8 +1,8 @@
 import type { Niveau, Dims } from '../types';
 
 /**
- * Arrondi une note à la demi-unité près en limitant l'intervalle à [0, 20].
- * Exemple : 9,76 → 9,5 ; 14,9 → 15,0.
+ * Arrondit une note à la demi-unité la plus proche en limitant l'intervalle à [0, 20].
+ * Exemple : 9,76 → 10 ; 14,9 → 15,0.
  */
 export function roundHalf(note: number): number {
   const clamped = Math.max(0, Math.min(20, note));

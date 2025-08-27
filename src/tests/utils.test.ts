@@ -5,7 +5,7 @@ import { presenceRate } from '../utils/aggregates';
 
 describe('scoring utils', () => {
   it('roundHalf arrondit correctement', () => {
-    expect(roundHalf(9.76)).toBe(9.5);
+    expect(roundHalf(9.76)).toBe(10);
     expect(roundHalf(14.9)).toBe(15);
     expect(roundHalf(-1)).toBe(0);
     expect(roundHalf(20.4)).toBe(20);
@@ -22,8 +22,8 @@ describe('scoring utils', () => {
   });
   it('computeNoteFinale calcule une note pour 2ème Bac', () => {
     const note = computeNoteFinale('2ème Bac', { projet: 14, tactique: 12, comportement: 10, connaissances: 8 });
-    // (14*40 + 12*30 + 10*20 + 8*10)/100 = 12.4 arrondi à 12.5
-    expect(note).toBe(12.5);
+    // (14*40 + 12*30 + 10*20 + 8*10)/100 = 12
+    expect(note).toBe(12);
   });
 });
 
