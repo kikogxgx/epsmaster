@@ -11,6 +11,21 @@ export function useReprogrammationSeances() {
   const { state, updateCycle } = useEpsData();
 
   /**
+   * Trie les séances par date croissante et renumérote leur ordre.
+   * La dernière séance est marquée comme due pour l'évaluation.
+   */
+  const trierEtRenumeroter = (seances: Seance[]): Seance[] => {
+    const sorted = [...seances].sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+    return sorted.map((s, idx) => ({
+      ...s,
+      numero: idx + 1,
+      evalDue: idx === sorted.length - 1
+    }));
+  };
+
+  /**
    * Détecte la cadence du cycle en jours (ex: 7 pour hebdomadaire)
    */
   /**
@@ -168,14 +183,15 @@ export function useReprogrammationSeances() {
       }
     }
 
-    // Appliquer les nouvelles dates et conserver l'ordre d'origine
+    // Appliquer les nouvelles dates puis trier et renuméroter
     const seancesFinal: Seance[] = seancesOriginalOrder.map((s, idx) => ({
       ...s,
       date: newDates[idx]
     }));
+    const seancesOrdonnees = trierEtRenumeroter(seancesFinal);
 
     return {
-      cycleModifie: { ...cycle, seances: seancesFinal },
+      cycleModifie: { ...cycle, seances: seancesOrdonnees },
       nbSeancesReportees: nbReportees
     };
   };
@@ -232,7 +248,8 @@ export function useReprogrammationSeances() {
           return seance;
         });
         if (modifie) {
-          updateCycle(cycle.id, { seances: seancesRestituees });
+          const seancesOrdonnees = trierEtRenumeroter(seancesRestituees);
+          updateCycle(cycle.id, { seances: seancesOrdonnees });
         }
       });
     }
