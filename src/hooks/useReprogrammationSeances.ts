@@ -12,6 +12,30 @@ export function useReprogrammationSeances() {
   const { state, updateCycle } = useEpsData();
 
   /**
+   * Détecte la cadence du cycle (écart en jours entre deux séances consécutives).
+   * Si les dates ne permettent pas de calculer un écart positif, on retourne 7 par défaut.
+   */
+  const detecterCadenceCycle = (seances: Seance[]): number => {
+    if (seances.length < 2) return 7;
+
+    // Extraire toutes les dates en millisecondes et les trier du plus ancien au plus récent
+    const timestamps = seances
+      .map((s) => new Date(s.date).getTime())
+      .filter((ts) => !isNaN(ts))
+      .sort((a, b) => a - b);
+
+    if (timestamps.length < 2) return 7;
+
+    // Chercher le premier écart positif entre deux dates consécutives
+    for (let i = 1; i < timestamps.length; i++) {
+      const diffMs = timestamps[i] - timestamps[i - 1];
+      const diffJours = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      if (diffJours > 0) return diffJours;
+    }
+    return 7;
+  };
+
+  /**
    * Reprogramme un cycle avec glissement complet des séances à partir de la première séance impactée.
    * Les séances sont repositionnées en conservant l'ordre d'origine mais en avançant les dates
    * selon les créneaux disponibles. On marque les séances décalées comme reportées.
@@ -138,7 +162,7 @@ export function useReprogrammationSeances() {
       const { cycleModifie, nbSeancesReportees } = reprogrammerCycle(cycle, absence);
 
       if (nbSeancesReportees > 0) {
-        // Signature d'updateCycle : on met à jour le cycle complet
+        // Mise à jour du cycle complet
         updateCycle({
           ...cycle,
           seances: cycleModifie.seances,
@@ -191,8 +215,10 @@ export function useReprogrammationSeances() {
   };
 
   return {
+    detecterCadenceCycle,
     appliquerReprogrammation,
     reprogrammerCycle,
     annulerReprogrammation,
   };
 }
+
