@@ -13,7 +13,7 @@ export function useReprogrammationSeances() {
 
   /**
    * Détecte la cadence du cycle (écart en jours entre deux séances consécutives).
-   * Si les dates ne permettent pas de calculer un écart positif, on retourne 7 par défaut.
+   * Si aucune cadence positive fiable, on retourne 7.
    */
   const detecterCadenceCycle = (seances: Seance[]): number => {
     if (seances.length < 2) return 7;
@@ -35,8 +35,8 @@ export function useReprogrammationSeances() {
 
   /**
    * Reprogramme un cycle à partir de la première séance impactée par l'absence :
-   * on conserve l'ordre, on avance les dates sur des créneaux disponibles
-   * et on marque les séances déplacées.
+   * conserve l'ordre, avance les dates sur des créneaux disponibles
+   * et marque les séances déplacées.
    */
   const reprogrammerCycle = (
     cycle: Cycle,

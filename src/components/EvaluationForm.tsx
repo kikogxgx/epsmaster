@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { computeNoteFinale } from '../utils/scoring';
 import type { Niveau, Dims, Eleve } from '../types';
 import GrilleAPS from './GrilleAPS';
+import { useEpsData } from '../hooks/useEpsData';
 
 interface EvaluationFormProps {
   eleve: Eleve;
@@ -17,14 +18,16 @@ interface EvaluationData {
   dateEvaluation: string;
 }
 
-const EvaluationForm: React.FC<EvaluationFormProps> = ({ 
-  eleve, 
-  cycleId, 
-  onSave, 
-  initialData 
+const EvaluationForm: React.FC<EvaluationFormProps> = ({
+  eleve,
+  cycleId,
+  onSave,
+  initialData
 }) => {
   const [dims, setDims] = useState<Dims>(initialData?.dims || {});
   const [commentaire, setCommentaire] = useState(initialData?.commentaire || '');
+  const { state } = useEpsData();
+  const cycle = state.cycles.find(c => c.id === cycleId);
 
   const updateDimension = (key: keyof Dims, value: number) => {
     const newDims = { ...dims, [key]: Math.max(0, Math.min(20, value)) };
@@ -57,19 +60,26 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
   };
 
   const getCoefficient = (niveau: Niveau, dimension: keyof Dims): number => {
-    const coefficients = {
+    const coefficients: Record<Niveau, Partial<Record<keyof Dims, number>>> = {
       'TC': { motricite: 60, comportement: 20, connaissances: 20 },
       '1ère Bac': { motricite: 50, tactique: 30, comportement: 10, connaissances: 10 },
       '2ème Bac': { projet: 40, tactique: 30, comportement: 20, connaissances: 10 }
-    };
-    return coefficients[niveau]?.[dimension] || 0;
+    } as any;
+    return coefficients[niveau]?.[dimension] ?? 0;
   };
 
   const dimensions = getDimensionsForNiveau(eleve.niveau);
 
   return (
     <div className="bg-white p-6 rounded-lg shadow space-y-6">
-      <GrilleAPS />
+      {/* Version avec props pour GrilleAPS (conforme à tes ajouts récents) */}
+      <GrilleAPS
+        aps={cycle?.aps}
+        niveau={eleve.niveau}
+        eleve={eleve.nom}
+        date={initialData?.dateEvaluation}
+      />
+
       <div className="border-t" />
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold">
@@ -100,7 +110,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
                 min="0"
                 max="20"
                 step="0.5"
-                value={dims[dim] || ''}
+                value={dims[dim] ?? ''}
                 onChange={(e) => updateDimension(dim, parseFloat(e.target.value) || 0)}
                 className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="0.0"
@@ -108,7 +118,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
               <span className="ml-2 text-sm text-gray-500">/20</span>
             </div>
             <div className="w-20 text-right text-sm text-gray-600">
-              {dims[dim] ? `${((dims[dim]! * getCoefficient(eleve.niveau, dim)) / 100).toFixed(1)}` : '0.0'}
+              {dims[dim] != null
+                ? `${((Number(dims[dim]) * getCoefficient(eleve.niveau, dim)) / 100).toFixed(1)}`
+                : '0.0'}
             </div>
           </div>
         ))}
@@ -130,14 +142,19 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
       <div className="bg-gray-50 p-4 rounded-md mb-4">
         <h4 className="font-medium mb-2">Détail du calcul :</h4>
         <div className="text-sm space-y-1">
-          {dimensions.map((dim) => (
-            dims[dim] ? (
+          {dimensions.map((dim) =>
+            dims[dim] != null ? (
               <div key={dim} className="flex justify-between">
-                <span className="capitalize">{dim} ({getCoefficient(eleve.niveau, dim)}%)</span>
-                <span>{dims[dim]} × {getCoefficient(eleve.niveau, dim)}% = {((dims[dim]! * getCoefficient(eleve.niveau, dim)) / 100).toFixed(1)}</span>
+                <span className="capitalize">
+                  {dim} ({getCoefficient(eleve.niveau, dim)}%)
+                </span>
+                <span>
+                  {dims[dim]} × {getCoefficient(eleve.niveau, dim)}% ={' '}
+                  {((Number(dims[dim]) * getCoefficient(eleve.niveau, dim)) / 100).toFixed(1)}
+                </span>
               </div>
             ) : null
-          ))}
+          )}
           <hr className="my-2" />
           <div className="flex justify-between font-medium">
             <span>Total</span>
