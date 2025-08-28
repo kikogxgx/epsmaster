@@ -71,6 +71,10 @@ export interface Cycle {
   seances: Seance[];
   statut?: CycleStatut;
   templateId?: string;
+  /**
+   * Date de dernière modification du cycle (ISO date-time).
+   */
+  updatedAt?: string;
 }
 
 // Item de liste d'appel pour une séance.
@@ -116,6 +120,13 @@ export interface Seance {
   cahier: Cahier;
 
   /**
+   * Champs ajoutés lorsqu'une séance est déplacée suite à une absence.
+   */
+  estReportee?: boolean;
+  absenceOriginId?: string;
+  dateOriginale?: string;
+
+  /**
    * Indique si une évaluation est prévue pour cette séance.
    * Si true, le tableau de bord affichera le bouton d’évaluation.
    */
@@ -145,4 +156,37 @@ export interface Seance {
     moyenne: number;
     commentaire?: string;
   }[];
+}
+
+// ---------- Absences professeur ----------
+
+export type TypeAbsence =
+  | 'maladie'
+  | 'competition'
+  | 'formation'
+  | 'jour_ferie'
+  | 'conge'
+  | 'autre';
+
+export interface AbsenceProfesseur {
+  id: string;
+  dateDebut: string; // ISO AAAA-MM-JJ
+  dateFin: string; // ISO AAAA-MM-JJ
+  type: TypeAbsence;
+  motif: string;
+  justificatif?: string; // base64 d'un fichier si besoin
+  statut: 'en_attente' | 'approuve' | 'refuse';
+  createdAt: string; // ISO Date-Time
+  seancesImpactees: string[]; // IDs des séances touchées
+}
+
+/** Réorganisation ou rattrapage d'une séance. */
+export interface RemplacementSeance {
+  seanceId: string;
+  dateOrigine: string; // ISO
+  nouvelleDate: string; // ISO
+  nouvelleHeure: string; // HH:MM
+  lieu?: string;
+  professeurRemplacant?: string;
+  statut: 'planifie' | 'realise' | 'annule';
 }
