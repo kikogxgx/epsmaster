@@ -72,7 +72,6 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
 
   return (
     <div className="bg-white p-6 rounded-lg shadow space-y-6">
-      {/* Version avec props pour GrilleAPS (conforme à tes ajouts récents) */}
       <GrilleAPS
         aps={cycle?.aps}
         niveau={eleve.niveau}
@@ -81,6 +80,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
       />
 
       <div className="border-t" />
+
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold">
           Évaluation - {eleve.nom}

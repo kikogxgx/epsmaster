@@ -1,9 +1,29 @@
 import React, { useState, useMemo } from 'react';
-import { grillesAPS, resolveAPS, APS, Critere } from '../data/grillesAPS';
+import * as APSData from '../data/grillesAPS';
+import type { APS, Critere } from '../data/grillesAPS';
 import type { Niveau } from '../types';
 
 const niveaux: Niveau[] = ['TC', '1ère Bac', '2ème Bac'];
 const apsOptions = ['Athlétisme', 'Sports collectifs', 'Football', 'Basket', 'Handball', 'Volley', 'Gymnastique'];
+
+// Fallback if resolveAPS isn't exported on this branch
+const fallbackResolveAPS = (val: string): APS => {
+  const v = (val || '').trim().toLowerCase();
+  if (['football', 'foot', 'basket', 'basketball', 'hand', 'handball', 'volley', 'volleyball'].includes(v)) {
+    return 'Sports collectifs' as APS;
+  }
+  if (v.startsWith('ath')) return 'Athlétisme' as APS;
+  if (v.startsWith('gym')) return 'Gymnastique' as APS;
+  // If user typed a canonical APS, pass it through; otherwise default to Sports collectifs
+  if (['Athlétisme', 'Sports collectifs', 'Gymnastique'].includes(val)) return val as APS;
+  return 'Sports collectifs' as APS;
+};
+
+const { grillesAPS } = APSData;
+const resolveAPS =
+  typeof (APSData as any).resolveAPS === 'function'
+    ? (APSData as any).resolveAPS
+    : fallbackResolveAPS;
 
 interface GrilleAPSProps {
   aps?: string;

@@ -44,6 +44,7 @@ export function useReprogrammationSeances() {
   ): { cycleModifie: Cycle; nbSeancesReportees: number } => {
     const dateDebutAbsence = new Date(absence.dateDebut);
     const dateFinAbsence = new Date(absence.dateFin);
+
     const aujourdHui = new Date();
     aujourdHui.setHours(0, 0, 0, 0);
 
@@ -60,7 +61,7 @@ export function useReprogrammationSeances() {
         dateSeance >= dateDebutAbsence &&
         dateSeance <= dateFinAbsence &&
         dateSeance >= aujourdHui &&
-        !s.locked &&
+        !(s as any).locked &&
         (s as any).absenceOriginId !== absence.id;
       if (estImpactee) impactedIds.add(s.id);
     });
