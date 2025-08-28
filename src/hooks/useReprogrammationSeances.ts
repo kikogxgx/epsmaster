@@ -1,5 +1,6 @@
 import { useEpsData } from './useEpsData';
 import type { Cycle, Seance, AbsenceProfesseur } from '../types';
+import { generateSeancesFromMultipleHoraires, trierSeances } from '../utils/planning';
 
 interface SeanceAvecReportage extends Seance {
   estReportee?: boolean;
@@ -11,66 +12,31 @@ export function useReprogrammationSeances() {
   const { state, updateCycle } = useEpsData();
 
   /**
-   * Détecte la cadence du cycle (écart en jours entre deux séances consécutives)
-   * Si les dates ne permettent pas de calculer un écart positif, on retourne 7 par défaut.
+   * Détecte la cadence du cycle (écart en jours entre deux séances consécutives).
+   * Si aucune cadence positive fiable, on retourne 7.
    */
   const detecterCadenceCycle = (seances: Seance[]): number => {
     if (seances.length < 2) return 7;
 
-    // Extraire toutes les dates en millisecondes et les trier du plus ancien au plus récent
     const timestamps = seances
-      .map(s => new Date(s.date).getTime())
-      .filter(ts => !isNaN(ts))
+      .map((s) => new Date(s.date).getTime())
+      .filter((ts) => !isNaN(ts))
       .sort((a, b) => a - b);
 
     if (timestamps.length < 2) return 7;
 
-    // Chercher le premier écart positif entre deux dates consécutives
-    let ecartJours = 7;
     for (let i = 1; i < timestamps.length; i++) {
       const diffMs = timestamps[i] - timestamps[i - 1];
       const diffJours = Math.round(diffMs / (1000 * 60 * 60 * 24));
-      if (diffJours > 0) {
-        ecartJours = diffJours;
-        break;
-      }
+      if (diffJours > 0) return diffJours;
     }
-    return ecartJours > 0 ? ecartJours : 7;
+    return 7;
   };
 
   /**
-   * Trouve la prochaine occurrence libre selon la cadence
-   */
-  /**
-   * Trouve la prochaine occurrence libre d'un créneau en avançant par pas de cadence.
-   * On passe une date de départ (ISO), l'heure, la cadence en jours et un set des créneaux déjà occupés.
-   */
-  const trouverProchaineOccurrence = (
-    dateDepart: string,
-    heure: string,
-    cadenceJours: number,
-    creneauxOccupes: Set<string>
-  ): string => {
-    const base = new Date(dateDepart);
-    // on commence à la date de départ + cadence
-    let testDate = new Date(base);
-    testDate.setDate(testDate.getDate() + cadenceJours);
-
-    while (true) {
-      const iso = testDate.toISOString().slice(0, 10);
-      const creneau = `${iso}-${heure}`;
-      if (!creneauxOccupes.has(creneau)) {
-        return iso;
-      }
-      // avancer d'une cadence
-      testDate.setDate(testDate.getDate() + cadenceJours);
-    }
-  };
-
-  /**
-   * Reprogramme un cycle avec glissement complet des séances à partir de la première séance impactée.
-   * Les séances sont repositionnées en conservant l'ordre d'origine mais en avançant les dates
-   * selon le motif des écarts entre séances. On marque les séances touchées par l'absence comme reportées.
+   * Reprogramme un cycle à partir de la première séance impactée par l'absence :
+   * conserve l'ordre, avance les dates sur des créneaux disponibles
+   * et marque les séances déplacées.
    */
   const reprogrammerCycle = (
     cycle: Cycle,
@@ -81,164 +47,162 @@ export function useReprogrammationSeances() {
     const aujourdHui = new Date();
     aujourdHui.setHours(0, 0, 0, 0);
 
-    // Copier les séances du cycle dans l'ordre d'origine pour la reprogrammation
-    const seancesOriginalOrder: SeanceAvecReportage[] = cycle.seances.map(s => ({ ...s }));
+    // Clone + tri croissant
+    let seances: SeanceAvecReportage[] = trierSeances(
+      cycle.seances.map((s) => ({ ...s }))
+    ) as SeanceAvecReportage[];
 
-    // Déterminer l'index de la première séance impactée par l'absence
-    const impactedIndices: number[] = [];
-    for (let i = 0; i < seancesOriginalOrder.length; i++) {
-      const seance = seancesOriginalOrder[i];
-      const dateSeance = new Date(seance.date);
+    // Séances impactées par la fenêtre d'absence
+    const impactedIds = new Set<string>();
+    seances.forEach((s) => {
+      const dateSeance = new Date(s.date);
       const estImpactee =
         dateSeance >= dateDebutAbsence &&
         dateSeance <= dateFinAbsence &&
         dateSeance >= aujourdHui &&
-        !seance.locked &&
-        (seance as any).absenceOriginId !== absence.id;
-      if (estImpactee) impactedIndices.push(i);
-    }
+        !s.locked &&
+        (s as any).absenceOriginId !== absence.id;
+      if (estImpactee) impactedIds.add(s.id);
+    });
 
-    if (impactedIndices.length === 0) {
+    if (impactedIds.size === 0) {
       return { cycleModifie: { ...cycle }, nbSeancesReportees: 0 };
     }
 
-    const firstImpacted = Math.min(...impactedIndices);
+    const firstImpactedIndex = seances.findIndex((s) => impactedIds.has(s.id));
+    const firstImpactedDate = seances[firstImpactedIndex].date;
 
-    // Construire un set des créneaux occupés (date-heure) pour détecter les collisions
+    // Horaires de la classe
+    const classe = state.classes.find((c) => c.id === cycle.classeId);
+    const horaires = classe?.horaires || [];
+
+    // Créneaux potentiels (largement au-delà du besoin)
+    const creneauxDisponibles = generateSeancesFromMultipleHoraires({
+      startDate: firstImpactedDate,
+      nbSeances: cycle.seances.length * 6,
+      horaires,
+    }).map((s) => ({ date: s.date, heure: s.heure }));
+
+    // Créneaux déjà pris par les séances non déplacées
     const creneauxOccupes = new Set<string>();
-    seancesOriginalOrder.forEach(seance => {
-      const heure = seance.heure || '09:30';
-      creneauxOccupes.add(`${seance.date}-${heure}`);
+    seances.slice(0, firstImpactedIndex).forEach((s) => {
+      const h = s.heure || '09:30';
+      creneauxOccupes.add(`${s.date}-${h}`);
     });
 
-    // Calculer le motif des écarts entre séances consécutives, trié par date croissante
-    const seancesSorted = [...seancesOriginalOrder].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    const diffOriginal: number[] = [];
-    for (let i = 0; i < seancesSorted.length - 1; i++) {
-      const d1 = new Date(seancesSorted[i].date);
-      const d2 = new Date(seancesSorted[i + 1].date);
-      const diff = Math.round((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-      diffOriginal.push(diff > 0 ? diff : 7);
-    }
-    if (diffOriginal.length === 0) diffOriginal.push(7);
-
-    // Construire un tableau d'écarts pour chaque séance en répétant le motif
-    const diffDays: number[] = [];
-    for (let i = 0; i < seancesOriginalOrder.length; i++) {
-      diffDays.push(diffOriginal[i % diffOriginal.length]);
-    }
-
-    // Préparer un tableau des nouvelles dates
-    const newDates: string[] = seancesOriginalOrder.map(s => s.date);
+    const idsADeplacer = seances.slice(firstImpactedIndex).map((s) => s.id);
+    let slotIdx = 0;
     let nbReportees = 0;
 
-    for (let i = firstImpacted; i < seancesOriginalOrder.length; i++) {
-      const seance = seancesOriginalOrder[i];
-      const heure = seance.heure || '09:30';
-      let candidateDate: Date;
-      if (i === firstImpacted) {
-        candidateDate = new Date(seance.date);
-        candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
-      } else {
-        candidateDate = new Date(newDates[i - 1]);
-        candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
-      }
-      let candidateIso = candidateDate.toISOString().slice(0, 10);
-      // Avancer en respectant le motif jusqu'à trouver un créneau libre et hors intervalle d'absence
+    for (const id of idsADeplacer) {
+      const seance = seances.find((s) => s.id === id)!;
+      const oldDate = seance.date;
+      const oldHeure = seance.heure || '09:30';
+
+      // Avancer jusqu'à être strictement après l'ancienne date
       while (
-        creneauxOccupes.has(`${candidateIso}-${heure}`) ||
-        (candidateDate >= dateDebutAbsence && candidateDate <= dateFinAbsence)
+        slotIdx < creneauxDisponibles.length &&
+        creneauxDisponibles[slotIdx].date <= oldDate
       ) {
-        candidateDate.setDate(candidateDate.getDate() + diffDays[i]);
-        candidateIso = candidateDate.toISOString().slice(0, 10);
+        slotIdx++;
       }
-      // Mettre à jour newDates et creneaux
-      creneauxOccupes.delete(`${seance.date}-${heure}`);
-      newDates[i] = candidateIso;
-      creneauxOccupes.add(`${candidateIso}-${heure}`);
-      // Toutes les séances déplacées gardent une trace de leur date d'origine afin
-      // de pouvoir annuler la reprogrammation si l'absence est supprimée.
-      if (i >= firstImpacted) {
-        seancesOriginalOrder[i].absenceOriginId = absence.id as any;
-        seancesOriginalOrder[i].dateOriginale = seance.date;
+
+      // Prochain créneau libre hors intervalle d'absence et sans collision
+      let slot: { date: string; heure?: string } | undefined;
+      while (slotIdx < creneauxDisponibles.length) {
+        const cand = creneauxDisponibles[slotIdx++];
+        const candDate = new Date(cand.date);
+        const candHeure = cand.heure || oldHeure;
+        const key = `${cand.date}-${candHeure}`;
+
+        if (candDate >= dateDebutAbsence && candDate <= dateFinAbsence) continue;
+        if (creneauxOccupes.has(key)) continue;
+
+        slot = { date: cand.date, heure: candHeure };
+        break;
       }
-      // Les séances initialement dans l'intervalle d'absence sont marquées comme reportées
-      if (impactedIndices.includes(i)) {
-        seancesOriginalOrder[i].estReportee = true;
-        nbReportees++;
-      }
+
+      if (!slot) continue;
+
+      // Mise à jour + marquage
+      seance.dateOriginale = seance.date;
+      seance.date = slot.date;
+      seance.heure = slot.heure || oldHeure;
+      seance.estReportee = true;
+      (seance as any).absenceOriginId = absence.id;
+
+      // Bloquer le créneau désormais utilisé
+      creneauxOccupes.add(`${seance.date}-${seance.heure}`);
+
+      nbReportees++;
     }
 
-    // Appliquer les nouvelles dates et conserver l'ordre d'origine
-    const seancesFinal: Seance[] = seancesOriginalOrder.map((s, idx) => ({
-      ...s,
-      date: newDates[idx]
-    }));
+    // Réordonner après déplacement
+    seances = trierSeances(seances) as SeanceAvecReportage[];
 
     return {
-      cycleModifie: { ...cycle, seances: seancesFinal },
-      nbSeancesReportees: nbReportees
+      cycleModifie: { ...cycle, seances },
+      nbSeancesReportees: nbReportees,
     };
   };
 
   /**
-   * Applique la reprogrammation pour tous les cycles impactés
+   * Applique la reprogrammation sur tous les cycles impactés.
    */
   const appliquerReprogrammation = (absence: AbsenceProfesseur) => {
     let totalSeancesReportees = 0;
     const cyclesModifies: string[] = [];
 
-    state.cycles.forEach(cycle => {
+    state.cycles.forEach((cycle) => {
       const { cycleModifie, nbSeancesReportees } = reprogrammerCycle(cycle, absence);
-      
       if (nbSeancesReportees > 0) {
-        updateCycle(cycle.id, { 
+        updateCycle({
+          ...cycle,
           seances: cycleModifie.seances,
-          updatedAt: new Date().toISOString()
+          updatedAt: new Date().toISOString(),
         });
         totalSeancesReportees += nbSeancesReportees;
         cyclesModifies.push(cycle.id);
       }
     });
 
-    return {
-      nbSeancesReportees: totalSeancesReportees,
-      cyclesModifies
-    };
+    return { nbSeancesReportees: totalSeancesReportees, cyclesModifies };
+  };
+
+  /**
+   * Annule la reprogrammation liée à une absence : restaure les dates d'origine.
+   */
+  const annulerReprogrammation = (absence: AbsenceProfesseur) => {
+    state.cycles.forEach((cycle) => {
+      let modifie = false;
+
+      const seancesRestituees: Seance[] = cycle.seances.map((seance) => {
+        const anyS = seance as any;
+        if (anyS.absenceOriginId === absence.id && anyS.dateOriginale) {
+          modifie = true;
+          const restored: Seance = { ...seance, date: anyS.dateOriginale };
+          delete (restored as any).dateOriginale;
+          delete (restored as any).estReportee;
+          delete (restored as any).absenceOriginId;
+          return restored;
+        }
+        return seance;
+      });
+
+      if (modifie) {
+        updateCycle({
+          ...cycle,
+          seances: trierSeances(seancesRestituees),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
   };
 
   return {
+    detecterCadenceCycle,
     appliquerReprogrammation,
     reprogrammerCycle,
-    /**
-     * Annule la reprogrammation liée à une absence en restaurant les dates d'origine
-     * pour les séances qui ont été reportées par cette absence.
-     */
-    annulerReprogrammation: (absence: AbsenceProfesseur) => {
-      // Pour chaque cycle, restaurer les dates des séances qui ont été reportées par cette absence
-      state.cycles.forEach(cycle => {
-        let modifie = false;
-        const seancesRestituees = cycle.seances.map(seance => {
-          if ((seance as any).absenceOriginId === absence.id && (seance as any).dateOriginale) {
-            modifie = true;
-            return {
-              ...seance,
-              date: (seance as any).dateOriginale,
-              // Nettoyer les marqueurs de report
-              estReportee: undefined,
-              absenceOriginId: undefined,
-              dateOriginale: undefined
-            } as Seance;
-          }
-          return seance;
-        });
-        if (modifie) {
-          updateCycle(cycle.id, {
-            seances: seancesRestituees,
-            updatedAt: new Date().toISOString()
-          });
-        }
-      });
-    }
+    annulerReprogrammation,
   };
 }
