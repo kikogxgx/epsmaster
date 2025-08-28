@@ -6,7 +6,12 @@ import type { Niveau, Dims } from '../types';
  */
 export function roundHalf(note: number): number {
   const clamped = Math.max(0, Math.min(20, note));
-  return Math.round(clamped * 2) / 2;
+  const floored = Math.floor(clamped * 10) / 10; // tronquer à 1 décimale
+  const base = Math.floor(floored);
+  const decimal = floored - base;
+  if (decimal >= 0.75) return base + 1;
+  if (decimal >= 0.25) return base + 0.5;
+  return base;
 }
 
 /**
@@ -30,9 +35,10 @@ export function computeNoteFinale(niveau: Niveau, dims: Dims): number {
     total += get('connaissances') * 10;
     coeff = 100;
   } else if (niveau === '2ème Bac') {
-    total += get('projet') * 40;
-    total += get('tactique') * 30;
-    total += get('comportement') * 20;
+    // Pondérations spécifiques : projet 50 %, tactique 25 %, comportement 15 %, connaissances 10 %
+    total += get('projet') * 50;
+    total += get('tactique') * 25;
+    total += get('comportement') * 15;
     total += get('connaissances') * 10;
     coeff = 100;
   }
