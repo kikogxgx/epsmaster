@@ -36,17 +36,17 @@ describe('reprogrammation de cycle', () => {
       semestre: 1,
       nbSeances: 4,
       seances: [
-        { id: 's1', cycleId: 'cy1', numero: 1, date: '2025-03-20', heure: '09:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' },
-        { id: 's2', cycleId: 'cy1', numero: 2, date: '2025-03-21', heure: '10:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' },
-        { id: 's3', cycleId: 'cy1', numero: 3, date: '2025-03-27', heure: '09:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' },
-        { id: 's4', cycleId: 'cy1', numero: 4, date: '2025-03-28', heure: '10:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' }
+        { id: 's1', cycleId: 'cy1', numero: 1, date: '2025-10-02', heure: '09:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' },
+        { id: 's2', cycleId: 'cy1', numero: 2, date: '2025-10-03', heure: '10:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' },
+        { id: 's3', cycleId: 'cy1', numero: 3, date: '2025-10-09', heure: '09:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' },
+        { id: 's4', cycleId: 'cy1', numero: 4, date: '2025-10-10', heure: '10:00', theme: '', locked: false, listeAppel: [], cahier: {}, statut: 'Planifiée' }
       ],
       statut: 'planifié'
     };
     const absence: AbsenceProfesseur = {
       id: 'a1',
-      dateDebut: '2025-03-20',
-      dateFin: '2025-03-21',
+      dateDebut: '2025-10-02',
+      dateFin: '2025-10-03',
       type: 'maladie' as any,
       motif: '',
       statut: 'en_attente',
@@ -57,5 +57,13 @@ describe('reprogrammation de cycle', () => {
     const { cycleModifie } = reprogrammerCycle(cycle, absence);
     const jours = cycleModifie.seances.map(s => new Date(s.date).getDay());
     expect(jours.every(j => j === 4 || j === 5)).toBe(true);
+
+    const debut = new Date(absence.dateDebut);
+    const fin = new Date(absence.dateFin);
+    const horsAbsence = cycleModifie.seances.every(s => {
+      const d = new Date(s.date);
+      return d < debut || d > fin;
+    });
+    expect(horsAbsence).toBe(true);
   });
 });

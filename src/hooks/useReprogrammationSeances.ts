@@ -68,16 +68,20 @@ export function useReprogrammationSeances() {
       creneauxOccupes.add(`${s.date}-${h}`);
     });
 
+    const idsADeplacer = seances.slice(firstImpactedIndex).map(s => s.id);
     let slotIdx = 0;
     let nbReportees = 0;
-    let i = firstImpactedIndex;
-    while (i < seances.length) {
-      let seance = seances[i];
+
+    for (const id of idsADeplacer) {
+      const seance = seances.find(s => s.id === id)!;
       const oldDate = seance.date;
       const oldHeure = seance.heure || '09:30';
 
       // Avancer dans la liste de créneaux pour être sûr d'être après la date actuelle
-      while (slotIdx < creneauxDisponibles.length && creneauxDisponibles[slotIdx].date <= oldDate) {
+      while (
+        slotIdx < creneauxDisponibles.length &&
+        creneauxDisponibles[slotIdx].date <= oldDate
+      ) {
         slotIdx++;
       }
 
@@ -109,7 +113,6 @@ export function useReprogrammationSeances() {
 
       // Réordonner pour maintenir la numérotation
       seances = trierSeances(seances) as SeanceAvecReportage[];
-      i = seances.findIndex(s => s.id === seance.id) + 1;
     }
 
     return {
