@@ -159,11 +159,15 @@ export function useReprogrammationSeances() {
       creneauxOccupes.delete(`${seance.date}-${heure}`);
       newDates[i] = candidateIso;
       creneauxOccupes.add(`${candidateIso}-${heure}`);
-      // Marquer les séances dans l'intervalle comme reportées
-      if (impactedIndices.includes(i)) {
-        seancesOriginalOrder[i].estReportee = true;
+      // Toutes les séances déplacées gardent une trace de leur date d'origine afin
+      // de pouvoir annuler la reprogrammation si l'absence est supprimée.
+      if (i >= firstImpacted) {
         seancesOriginalOrder[i].absenceOriginId = absence.id as any;
         seancesOriginalOrder[i].dateOriginale = seance.date;
+      }
+      // Les séances initialement dans l'intervalle d'absence sont marquées comme reportées
+      if (impactedIndices.includes(i)) {
+        seancesOriginalOrder[i].estReportee = true;
         nbReportees++;
       }
     }
@@ -232,7 +236,10 @@ export function useReprogrammationSeances() {
           return seance;
         });
         if (modifie) {
-          updateCycle(cycle.id, { seances: seancesRestituees });
+          updateCycle(cycle.id, {
+            seances: seancesRestituees,
+            updatedAt: new Date().toISOString()
+          });
         }
       });
     }
