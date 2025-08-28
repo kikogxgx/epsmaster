@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { computeNoteFinale, roundHalf } from '../utils/scoring';
+import { computeNoteFinale } from '../utils/scoring';
 import type { Niveau, Dims, Eleve } from '../types';
+import GrilleAPS from './GrilleAPS';
 
 interface EvaluationFormProps {
   eleve: Eleve;
@@ -67,7 +68,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
   const dimensions = getDimensionsForNiveau(eleve.niveau);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="bg-white p-6 rounded-lg shadow space-y-6">
+      <GrilleAPS />
+      <div className="border-t" />
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold">
           Évaluation - {eleve.nom}
