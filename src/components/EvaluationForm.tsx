@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { computeNoteFinale, roundHalf } from '../utils/scoring';
+import { computeNoteFinale } from '../utils/scoring';
 import type { Niveau, Dims, Eleve } from '../types';
+import GrilleAPS from './GrilleAPS';
+import { useEpsData } from '../hooks/useEpsData';
 
 interface EvaluationFormProps {
   eleve: Eleve;
@@ -16,14 +18,16 @@ interface EvaluationData {
   dateEvaluation: string;
 }
 
-const EvaluationForm: React.FC<EvaluationFormProps> = ({ 
-  eleve, 
-  cycleId, 
-  onSave, 
-  initialData 
+const EvaluationForm: React.FC<EvaluationFormProps> = ({
+  eleve,
+  cycleId,
+  onSave,
+  initialData
 }) => {
   const [dims, setDims] = useState<Dims>(initialData?.dims || {});
   const [commentaire, setCommentaire] = useState(initialData?.commentaire || '');
+  const { state } = useEpsData();
+  const cycle = state.cycles.find(c => c.id === cycleId);
 
   const updateDimension = (key: keyof Dims, value: number) => {
     const newDims = { ...dims, [key]: Math.max(0, Math.min(20, value)) };
@@ -59,7 +63,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
     const coefficients = {
       'TC': { motricite: 60, comportement: 20, connaissances: 20 },
       '1ère Bac': { motricite: 50, tactique: 30, comportement: 10, connaissances: 10 },
-      '2ème Bac': { projet: 40, tactique: 30, comportement: 20, connaissances: 10 }
+      '2ème Bac': { projet: 50, tactique: 25, comportement: 15, connaissances: 10 }
     };
     return coefficients[niveau]?.[dimension] || 0;
   };
@@ -67,7 +71,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
   const dimensions = getDimensionsForNiveau(eleve.niveau);
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="bg-white p-6 rounded-lg shadow space-y-6">
+      <GrilleAPS aps={cycle?.aps} niveau={eleve.niveau} eleve={eleve.nom} date={initialData?.dateEvaluation} />
+      <div className="border-t" />
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-semibold">
           Évaluation - {eleve.nom}
