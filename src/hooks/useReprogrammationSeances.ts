@@ -97,17 +97,7 @@ export function useReprogrammationSeances() {
         slot = { date: cand.date, heure: candHeure };
         break;
       }
-      if (!slot) break;
 
-      // Mettre à jour la séance et les créneaux occupés
-      seance.date = slot.date;
-      seance.heure = slot.heure;
-      creneauxOccupes.add(`${slot.date}-${slot.heure}`);
-
-      if (impactedIds.has(seance.id)) {
-        seance.estReportee = true;
-        seance.absenceOriginId = absence.id as any;
-        seance.dateOriginale = oldDate;
         nbReportees++;
       }
 
@@ -173,7 +163,10 @@ export function useReprogrammationSeances() {
           return seance;
         });
         if (modifie) {
-          updateCycle(cycle.id, { seances: seancesRestituees });
+          updateCycle(cycle.id, {
+            seances: seancesRestituees,
+            updatedAt: new Date().toISOString()
+          });
         }
       });
     }

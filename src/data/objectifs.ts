@@ -504,9 +504,9 @@ const MODULES_DATA: Record<ModuleNumero, ModuleObjectifs> = {
           "Saut réglementaire.",
           "Évaluation finale."
         ]
-      }
-    ],
-  },
+      },
+      ],
+    },
 
   // ────────────────────────────────────────────────────────────────────────────
   4: {
@@ -743,7 +743,7 @@ const MODULES_DATA: Record<ModuleNumero, ModuleObjectifs> = {
         ]
       },
       { 
-        aps: "Athlétisme — Lancer de poids", 
+        aps: "Athlétisme — Lancer de poids",
         seances: [
           "Tenue de l'engin (bases des doigts, coude levé).",
           "Lever l'engin, bras en arrière, ouvrir buste/hanche, bras libre (rattrapage).",
@@ -757,6 +757,74 @@ const MODULES_DATA: Record<ModuleNumero, ModuleObjectifs> = {
           "Évaluation formative.",
           "Évaluation sommative.",
           "—"
+        ]
+      },
+      {
+        aps: "Handball",
+        seances: [
+          "Détecter niveau individuel/collectif (progression, conservation, efficacité attaque/défense).",
+          "Différents types de passes en égalité numérique.",
+          "Donner et réceptionner en mouvement.",
+          "Jouer en mouvement jusqu'à la zone de marque et tirer.",
+          "Passes précises et rapides en supériorité numérique.",
+          "Se démarquer dans les zones libres (égalité).",
+          "Respecter son poste et avancer collectivement.",
+          "Pré-test.",
+          "Défendre son poste puis s'organiser pour contre-attaquer.",
+          "Choix alternatif passe/dribble (égalité).",
+          "Se situer en appui/soutien pour favoriser l'échange.",
+          "Évaluation en match (individuel/collectif)."
+        ]
+      },
+      {
+        aps: "Gymnastique au sol",
+        seances: [
+          "Évaluation diagnostique (fiche de niveau).",
+          "Éléments A + liaisons.",
+          "Consolider A.",
+          "Éléments B.",
+          "Consolider B.",
+          "Éléments C avec aide/parade.",
+          "Consolider C.",
+          "Mini-enchaînement 2A+2B.",
+          "Mini-enchaînement 2A+1B+1C.",
+          "Enchaînement 2A+2B+1C.",
+          "Préparer 2A+3B+2C.",
+          "Évaluation finale (enchaînement complet)."
+        ]
+      },
+      {
+        aps: "Athlétisme — Course de vitesse",
+        seances: [
+          "Observer le niveau initial.",
+          "Position des appuis au départ.",
+          "Réagir rapidement (positions du corps).",
+          "Réagir aux signaux visuels/auditifs.",
+          "Se positionner au starting-block (prise de contact).",
+          "Conscience du pied de poussée + passage du pied libre.",
+          "Redressement progressif + synchro bras/jambes.",
+          "Trajet rectiligne + positionnement du pied en fin de course.",
+          "Trajet rectiligne à rythme variable.",
+          "Bon départ + redressement + course rythmique.",
+          "Bon départ + redressement + course axée.",
+          "Évaluation (80m G / 60m F)."
+        ]
+      },
+      {
+        aps: "Athlétisme — Saut en longueur",
+        seances: [
+          "Détecter le niveau initial.",
+          "Étalonner course d'élan + impulsion.",
+          "Recherche de course optimale.",
+          "Ajuster le pied d'appel (3 dernières foulées).",
+          "Liaison course–impulsion sans perte.",
+          "Saut avec angle optimal.",
+          "Suspension — ouverture.",
+          "Suspension — ramené.",
+          "Réception vers l'avant.",
+          "Pré-test des acquis.",
+          "Saut réglementaire.",
+          "Évaluation finale."
         ]
       }
     ],
