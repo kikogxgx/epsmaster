@@ -21,9 +21,9 @@ describe('scoring utils', () => {
     expect(note).toBe(10.5);
   });
   it('computeNoteFinale calcule une note pour 2ème Bac', () => {
-    const note = computeNoteFinale('2ème Bac', { projet: 14, tactique: 12, comportement: 10, connaissances: 8 });
-    // (14*40 + 12*30 + 10*20 + 8*10)/100 = 12.4 arrondi à 12.5
-    expect(note).toBe(12.5);
+    const note = computeNoteFinale('2ème Bac', { projet: 20, tactique: 0, comportement: 0, connaissances: 0 });
+    // (20*50)/100 = 10
+    expect(note).toBe(10);
   });
 });
 

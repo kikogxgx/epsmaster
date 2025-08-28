@@ -8,12 +8,15 @@ interface SeanceAvecReportage extends Seance {
   dateOriginale?: string;
 }
 
+/**
+ * Hook de gestion de reprogrammation des séances en cas d'absence professeur.
+ */
 export function useReprogrammationSeances() {
   const { state, updateCycle } = useEpsData();
 
   /**
    * Détecte la cadence du cycle (écart en jours entre deux séances consécutives).
-   * Si aucune cadence positive fiable, on retourne 7.
+   * Si aucune cadence positive fiable, retourne 7.
    */
   const detecterCadenceCycle = (seances: Seance[]): number => {
     if (seances.length < 2) return 7;
@@ -82,7 +85,7 @@ export function useReprogrammationSeances() {
       startDate: firstImpactedDate,
       nbSeances: cycle.seances.length * 6,
       horaires,
-    }).map((s) => ({ date: s.date, heure: s.heure }));
+    }).map((s: Seance) => ({ date: s.date, heure: s.heure }));
 
     // Créneaux déjà pris par les séances non déplacées
     const creneauxOccupes = new Set<string>();

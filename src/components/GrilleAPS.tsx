@@ -1,10 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import * as APSData from '../data/grillesAPS';
 import type { APS, Critere } from '../data/grillesAPS';
 import type { Niveau } from '../types';
 
 const niveaux: Niveau[] = ['TC', '1ère Bac', '2ème Bac'];
-const apsOptions = ['Athlétisme', 'Sports collectifs', 'Football', 'Basket', 'Handball', 'Volley', 'Gymnastique'];
+const apsOptions = [
+  'Athlétisme',
+  'Sports collectifs',
+  'Football',
+  'Basket',
+  'Handball',
+  'Volley',
+  'Gymnastique',
+];
 
 // Fallback if resolveAPS isn't exported on this branch
 const fallbackResolveAPS = (val: string): APS => {
@@ -20,7 +28,7 @@ const fallbackResolveAPS = (val: string): APS => {
 };
 
 const { grillesAPS } = APSData;
-const resolveAPS =
+const resolveAPS: (val: string) => APS =
   typeof (APSData as any).resolveAPS === 'function'
     ? (APSData as any).resolveAPS
     : fallbackResolveAPS;
@@ -38,29 +46,36 @@ const GrilleAPS: React.FC<GrilleAPSProps> = ({
   eleve,
   date,
 }) => {
-  const [apsInput, setApsInput] = useState(apsProp);
+  const [apsInput, setApsInput] = useState<string>(apsProp);
   const aps: APS = useMemo(() => resolveAPS(apsInput), [apsInput]);
+
   const [niveau, setNiveau] = useState<Niveau>(niveauProp);
   const [notes, setNotes] = useState<Record<string, number>>({});
   const [commentaires, setCommentaires] = useState<Record<string, string>>({});
   const [dateEval, setDateEval] = useState<string>(date || new Date().toISOString().split('T')[0]);
 
-  const criteres = grillesAPS[aps];
+  const criteres: Critere[] = grillesAPS[aps] ?? [];
 
-  const total = criteres.reduce((sum, crit) => {
-    if (crit.sousCriteres) {
-      return sum + crit.sousCriteres.reduce((s, c) => s + (notes[c.id] || 0), 0);
-    }
-    return sum + (notes[crit.id] || 0);
-  }, 0);
+  const total = useMemo(() => {
+    return criteres.reduce((sum, crit) => {
+      if (crit.sousCriteres && crit.sousCriteres.length > 0) {
+        return (
+          sum +
+          crit.sousCriteres.reduce((s, c) => s + (Number.isFinite(notes[c.id]) ? notes[c.id] : 0), 0)
+        );
+      }
+      return sum + (Number.isFinite(notes[crit.id]) ? notes[crit.id] : 0);
+    }, 0);
+  }, [criteres, notes]);
 
   const updateNote = (id: string, value: number, max: number) => {
-    const v = Math.max(0, Math.min(max, isNaN(value) ? 0 : value));
+    const safe = Number.isFinite(value) ? value : 0;
+    const v = Math.max(0, Math.min(max, safe));
     setNotes((prev) => ({ ...prev, [id]: v }));
   };
 
   const sumBareme = (crit: Critere): number => {
-    if (crit.sousCriteres) {
+    if (crit.sousCriteres && crit.sousCriteres.length > 0) {
       return crit.sousCriteres.reduce((s, c) => s + c.bareme[niveau], 0);
     }
     return crit.bareme[niveau];
@@ -130,16 +145,22 @@ const GrilleAPS: React.FC<GrilleAPSProps> = ({
         </div>
       </div>
 
+      {criteres.length === 0 && (
+        <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+          Aucune grille trouvée pour « {aps} ». Essayez une autre APS.
+        </div>
+      )}
+
       {criteres.map((crit) => (
         <details key={crit.id} className="border rounded">
           <summary className="cursor-pointer px-4 py-2 font-medium bg-gray-50">
             {crit.id}. {crit.titre} ({sumBareme(crit)})
           </summary>
           <div className="p-4 space-y-2">
-            <div className="text-sm text-gray-600">{crit.definition}</div>
-            <div className="text-sm text-gray-600">Outils : {crit.outils}</div>
+            {crit.definition && <div className="text-sm text-gray-600">{crit.definition}</div>}
+            {crit.outils && <div className="text-sm text-gray-600">Outils : {crit.outils}</div>}
 
-            {crit.sousCriteres ? (
+            {crit.sousCriteres && crit.sousCriteres.length > 0 ? (
               crit.sousCriteres.map((sc) => (
                 <div key={sc.id} className="flex items-center gap-2">
                   <label className="flex-1 text-sm">
@@ -147,13 +168,13 @@ const GrilleAPS: React.FC<GrilleAPSProps> = ({
                   </label>
                   <input
                     type="number"
-                    min="0"
+                    min={0}
                     max={sc.bareme[niveau]}
-                    value={notes[sc.id] ?? ''}
+                    value={Number.isFinite(notes[sc.id]) ? notes[sc.id] : ''}
                     onChange={(e) =>
                       updateNote(sc.id, parseFloat(e.target.value), sc.bareme[niveau])
                     }
-                    className="w-16 border rounded px-2 py-1"
+                    className="w-20 border rounded px-2 py-1"
                   />
                 </div>
               ))
@@ -162,13 +183,13 @@ const GrilleAPS: React.FC<GrilleAPSProps> = ({
                 <label className="flex-1 text-sm">Barème {crit.bareme[niveau]}</label>
                 <input
                   type="number"
-                  min="0"
+                  min={0}
                   max={crit.bareme[niveau]}
-                  value={notes[crit.id] ?? ''}
+                  value={Number.isFinite(notes[crit.id]) ? notes[crit.id] : ''}
                   onChange={(e) =>
                     updateNote(crit.id, parseFloat(e.target.value), crit.bareme[niveau])
                   }
-                  className="w-16 border rounded px-2 py-1"
+                  className="w-20 border rounded px-2 py-1"
                 />
               </div>
             )}

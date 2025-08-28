@@ -18,19 +18,49 @@ interface EvaluationData {
   dateEvaluation: string;
 }
 
+// NOTE: Ces coefficients doivent rester alignés avec computeNoteFinale.
+// Si l'utilitaire change, mettez à jour la table ci-dessous ou déportez-la
+// dans un module partagé (p.ex. ../utils/scoring).
+const COEFFICIENTS: Record<Niveau, Partial<Record<keyof Dims, number>>> = {
+  TC: { motricite: 60, comportement: 20, connaissances: 20 },
+  "1ère Bac": { motricite: 50, tactique: 30, comportement: 10, connaissances: 10 },
+  // Variante observée dans la branche: { projet: 50, tactique: 25, comportement: 15, connaissances: 10 }
+  // Choix retenu (main): 40/30/20/10. Adaptez si besoin.
+  "2ème Bac": { projet: 40, tactique: 30, comportement: 20, connaissances: 10 },
+} as any;
+
+const getDimensionsForNiveau = (niveau: Niveau): (keyof Dims)[] => {
+  switch (niveau) {
+    case 'TC':
+      return ['motricite', 'comportement', 'connaissances'];
+    case '1ère Bac':
+      return ['motricite', 'tactique', 'comportement', 'connaissances'];
+    case '2ème Bac':
+      return ['projet', 'tactique', 'comportement', 'connaissances'];
+    default:
+      return [];
+  }
+};
+
+const getCoefficient = (niveau: Niveau, dimension: keyof Dims): number => {
+  return COEFFICIENTS[niveau]?.[dimension] ?? 0;
+};
+
 const EvaluationForm: React.FC<EvaluationFormProps> = ({
   eleve,
   cycleId,
   onSave,
-  initialData
+  initialData,
 }) => {
-  const [dims, setDims] = useState<Dims>(initialData?.dims || {});
+  const [dims, setDims] = useState<Dims>(initialData?.dims || {} as Dims);
   const [commentaire, setCommentaire] = useState(initialData?.commentaire || '');
   const { state } = useEpsData();
-  const cycle = state.cycles.find(c => c.id === cycleId);
+  const cycle = state.cycles.find((c) => c.id === cycleId);
 
   const updateDimension = (key: keyof Dims, value: number) => {
-    const newDims = { ...dims, [key]: Math.max(0, Math.min(20, value)) };
+    const v = Number.isFinite(value) ? value : 0;
+    const clamped = Math.max(0, Math.min(20, v));
+    const newDims = { ...dims, [key]: clamped } as Dims;
     setDims(newDims);
   };
 
@@ -41,31 +71,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
       dims,
       noteFinale,
       commentaire,
-      dateEvaluation: new Date().toISOString().split('T')[0]
+      dateEvaluation: new Date().toISOString().split('T')[0],
     };
     onSave(eleve.id, cycleId, evaluation);
-  };
-
-  const getDimensionsForNiveau = (niveau: Niveau): (keyof Dims)[] => {
-    switch (niveau) {
-      case 'TC':
-        return ['motricite', 'comportement', 'connaissances'];
-      case '1ère Bac':
-        return ['motricite', 'tactique', 'comportement', 'connaissances'];
-      case '2ème Bac':
-        return ['projet', 'tactique', 'comportement', 'connaissances'];
-      default:
-        return [];
-    }
-  };
-
-  const getCoefficient = (niveau: Niveau, dimension: keyof Dims): number => {
-    const coefficients: Record<Niveau, Partial<Record<keyof Dims, number>>> = {
-      'TC': { motricite: 60, comportement: 20, connaissances: 20 },
-      '1ère Bac': { motricite: 50, tactique: 30, comportement: 10, connaissances: 10 },
-      '2ème Bac': { projet: 40, tactique: 30, comportement: 20, connaissances: 10 }
-    } as any;
-    return coefficients[niveau]?.[dimension] ?? 0;
   };
 
   const dimensions = getDimensionsForNiveau(eleve.niveau);
@@ -82,37 +90,32 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
       <div className="border-t" />
 
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-semibold">
-          Évaluation - {eleve.nom}
-        </h3>
+        <h3 className="text-lg font-semibold">Évaluation - {eleve.nom}</h3>
         <div className="text-right">
-          <div className="text-2xl font-bold text-blue-600">
-            {noteFinale.toFixed(1)}/20
-          </div>
+          <div className="text-2xl font-bold text-blue-600">{noteFinale.toFixed(1)}/20</div>
           <div className="text-sm text-gray-500">Note finale</div>
         </div>
       </div>
 
       <div className="grid gap-4 mb-6">
         {dimensions.map((dim) => (
-          <div key={dim} className="flex items-center gap-4">
+          <div key={String(dim)} className="flex items-center gap-4">
             <div className="w-32">
               <label className="block text-sm font-medium text-gray-700 capitalize">
-                {dim}
-                <span className="text-xs text-gray-500 ml-1">
-                  ({getCoefficient(eleve.niveau, dim)}%)
-                </span>
+                {String(dim)}
+                <span className="text-xs text-gray-500 ml-1">({getCoefficient(eleve.niveau, dim)}%)</span>
               </label>
             </div>
             <div className="flex-1">
               <input
                 type="number"
-                min="0"
-                max="20"
-                step="0.5"
+                inputMode="decimal"
+                min={0}
+                max={20}
+                step={0.5}
                 value={dims[dim] ?? ''}
-                onChange={(e) => updateDimension(dim, parseFloat(e.target.value) || 0)}
-                className="w-20 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => updateDimension(dim, parseFloat(e.target.value))}
+                className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="0.0"
               />
               <span className="ml-2 text-sm text-gray-500">/20</span>
@@ -127,9 +130,7 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Commentaire
-        </label>
+        <label className="block text-sm font-medium text-gray-700 mb-2">Commentaire</label>
         <textarea
           value={commentaire}
           onChange={(e) => setCommentaire(e.target.value)}
@@ -144,9 +145,9 @@ const EvaluationForm: React.FC<EvaluationFormProps> = ({
         <div className="text-sm space-y-1">
           {dimensions.map((dim) =>
             dims[dim] != null ? (
-              <div key={dim} className="flex justify-between">
+              <div key={String(dim)} className="flex justify-between">
                 <span className="capitalize">
-                  {dim} ({getCoefficient(eleve.niveau, dim)}%)
+                  {String(dim)} ({getCoefficient(eleve.niveau, dim)}%)
                 </span>
                 <span>
                   {dims[dim]} × {getCoefficient(eleve.niveau, dim)}% ={' '}
