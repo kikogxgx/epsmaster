@@ -340,7 +340,7 @@ const CycleDetailPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {seance.evalDue ? (
                           <Link
-                            to={`/evaluation/${cycle.classeId}/${seance.id}`}
+                            to={`/classe/${cycle.classeId}/seance/${seance.id}/evaluation`}
                             className="text-primary-600 hover:text-primary-900"
                           >
                             {seance.statut === 'Évaluée' ? 'Voir' : 'Évaluer'}
