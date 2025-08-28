@@ -183,3 +183,14 @@ export function bulkCreateCyclesByNiveau({
 
   return newCycles;
 }
+
+/**
+ * Trie les séances par date chronologique et met à jour leur numérotation.
+ * Utile après un repositionnement de séances afin de conserver des numéros
+ * cohérents avec l'ordre réel.
+ */
+export function trierSeances(seances: Seance[]): Seance[] {
+  return [...seances]
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .map((s, idx) => ({ ...s, numero: idx + 1 }));
+}
